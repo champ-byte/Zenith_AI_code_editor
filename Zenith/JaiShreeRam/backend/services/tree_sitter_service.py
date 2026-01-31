@@ -34,9 +34,8 @@ class TreeSitterService:
             # Python
             try:
                 import tree_sitter_python
-                PY_LANGUAGE = tree_sitter.Language(tree_sitter_python.language())
-                parser_py = tree_sitter.Parser()
-                parser_py.set_language(PY_LANGUAGE)
+                PY_LANGUAGE = Language(tree_sitter_python.language())
+                parser_py = Parser(PY_LANGUAGE)
                 self.parsers['python'] = parser_py
                 self.languages['python'] = PY_LANGUAGE
             except ImportError:
@@ -47,9 +46,8 @@ class TreeSitterService:
             # JavaScript
             try:
                 import tree_sitter_javascript
-                JS_LANGUAGE = tree_sitter.Language(tree_sitter_javascript.language())
-                parser_js = tree_sitter.Parser()
-                parser_js.set_language(JS_LANGUAGE)
+                JS_LANGUAGE = Language(tree_sitter_javascript.language())
+                parser_js = Parser(JS_LANGUAGE)
                 self.parsers['javascript'] = parser_js
                 self.languages['javascript'] = JS_LANGUAGE
             except ImportError:
@@ -60,9 +58,8 @@ class TreeSitterService:
             # TypeScript
             try:
                 import tree_sitter_typescript
-                TS_LANGUAGE = tree_sitter.Language(tree_sitter_typescript.language_typescript())
-                parser_ts = tree_sitter.Parser()
-                parser_ts.set_language(TS_LANGUAGE)
+                TS_LANGUAGE = Language(tree_sitter_typescript.language_typescript())
+                parser_ts = Parser(TS_LANGUAGE)
                 self.parsers['typescript'] = parser_ts
                 self.languages['typescript'] = TS_LANGUAGE
             except ImportError:

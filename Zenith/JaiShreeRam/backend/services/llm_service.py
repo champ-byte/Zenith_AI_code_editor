@@ -22,41 +22,66 @@ import google.generativeai as genai
 
 logger = logging.getLogger(__name__)
 
+from dotenv import load_dotenv
+
+load_dotenv()
+
 class GeminiService:
     def __init__(self):
         """Initialize Gemini service"""
         self.api_key = os.getenv("GEMINI_API_KEY")
+        self.model_name = os.getenv("GEMINI_MODEL", "gemini-2.5-flash")
+        
+        # Initialize attributes
+        self.llm = None
+        self.creative_llm = None
+        self.precise_llm = None
+        self.analytical_llm = None
+        self.model = f"{self.model_name} (unconfigured)"
+        
         if not self.api_key:
             logger.error("GEMINI_API_KEY is not set")
-            # This allows the app to start, but calls will fail/log warnings
             logger.warning("Generative AI features will be unavailable.")
-        
-        if self.api_key:
+        else:
+            # Set GOOGLE_API_KEY for LangChain components that might look for it
+            os.environ["GOOGLE_API_KEY"] = self.api_key
+            self._initialize_llms()
+
+    def _initialize_llms(self):
+        """Initialize all variations of the LLM"""
+        try:
+            if self.api_key:
+                logger.info(f"Configuring Gemini with key: {self.api_key[:5]}...{self.api_key[-5:]} (Len: {len(self.api_key)})")
             genai.configure(api_key=self.api_key)
-            self.llm = ChatGoogleGenerativeAI(model="gemini-2.5-flash", google_api_key=self.api_key, temperature=0.7)
-            self.model = "gemini-2.5-flash"
-            logger.info(f"Gemini Service initialized with model: {self.model}")
+            # Use specific model names and ensure api_key is passed explicitly
+            self.llm = ChatGoogleGenerativeAI(model=self.model_name, google_api_key=self.api_key, temperature=0.7)
+            self.model = self.model_name
             
             # Initialize specialized LLMs
-            self.creative_llm = ChatGoogleGenerativeAI(model="gemini-2.5-flash", google_api_key=self.api_key, temperature=0.9)
-            self.precise_llm = ChatGoogleGenerativeAI(model="gemini-2.5-flash", google_api_key=self.api_key, temperature=0.1)
-            self.analytical_llm = ChatGoogleGenerativeAI(model="gemini-2.5-flash", google_api_key=self.api_key, temperature=0.3)
-        else:
+            self.creative_llm = ChatGoogleGenerativeAI(model=self.model_name, google_api_key=self.api_key, temperature=0.9)
+            self.precise_llm = ChatGoogleGenerativeAI(model=self.model_name, google_api_key=self.api_key, temperature=0.1)
+            self.analytical_llm = ChatGoogleGenerativeAI(model=self.model_name, google_api_key=self.api_key, temperature=0.3)
+            
+            logger.info(f"Gemini Service initialized with model: {self.model}")
+        except Exception as e:
+            logger.error(f"Failed to initialize Gemini components: {str(e)}")
             self.llm = None
             self.creative_llm = None
             self.precise_llm = None
             self.analytical_llm = None
-            self.model = "gemini-2.5-flash (unconfigured)"
+            self.model = f"{self.model_name} (error)"
 
     def _ensure_configured(self):
         if not self.llm:
             # Try to reload key in case it was added later
             self.api_key = os.getenv("GEMINI_API_KEY")
             if self.api_key:
-                genai.configure(api_key=self.api_key)
-                self.llm = ChatGoogleGenerativeAI(model="gemini-2.5-flash", google_api_key=self.api_key, temperature=0.7)
+                os.environ["GOOGLE_API_KEY"] = self.api_key
+                self._initialize_llms()
+                if not self.llm:
+                    raise ValueError("Gemini initialization failed even with API key. Check logs.")
             else:
-                raise ValueError("GEMINI_API_KEY is missing. Please add it to .env file.")
+                raise ValueError("GEMINI_API_KEY is missing. Please add it to .env file and RESTART the server.")
 
     def generate_code(self, prompt: str, language: str = "python", context: str = "") -> Dict[str, Any]:
         """Generate code using Gemini"""
@@ -209,6 +234,24 @@ Provide both the optimized code and explanation of changes.
             system_content = """You are an AI coding assistant. You help with code generation, explanation, debugging, optimization, and answering questions.
 Be helpful, accurate, and provide code examples when needed.
 Format code blocks with proper syntax highlighting.
+
+GIT CAPABILITIES:
+You are an agentic assistant that can perform Git operations. If the user asks you to push, pull, commit, or manage branches, you MUST include a `<git_action>` tag at the very end of your response with the appropriate JSON command.
+
+Supported commands (JSON):
+- { "action": "status" }
+- { "action": "create-branch", "data": { "name": "branch-name" } }
+- { "action": "checkout", "data": { "name": "branch-name" } }
+- { "action": "commit", "data": "Commit message" }
+- { "action": "push" }
+- { "action": "pull" }
+- { "action": "sync" }
+
+Example Use Case:
+User: "Push my current changes to the 'main' branch."
+Response: "I will push your current changes to the main branch for you locally. <git_action>{ \"action\": \"push\" }</git_action>"
+
+Always confirm the action in your text response.
 """
             if context:
                 # Special handling for RAG components

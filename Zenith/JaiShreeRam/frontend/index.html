@@ -360,11 +360,13 @@
             margin: 0;
             padding: 3px 0;
             cursor: pointer;
-            display: flex; /* Ensure flex for alignment */
+            display: flex;
+            /* Ensure flex for alignment */
             align-items: center;
             color: #cccccc;
             font-size: 13px;
-            border: 1px solid transparent; /* Reserve space for border */
+            border: 1px solid transparent;
+            /* Reserve space for border */
         }
 
         .file-item:hover,
@@ -377,7 +379,8 @@
         .file-item.active,
         .folder-item.active {
             background-color: #37373d;
-            border: none; /* VS Code uses background color primarily */
+            border: none;
+            /* VS Code uses background color primarily */
             color: #ffffff;
         }
 
@@ -400,7 +403,8 @@
         }
 
         .file-info {
-            display: none; /* Hide file info for compact view unless heavily requested */
+            display: none;
+            /* Hide file info for compact view unless heavily requested */
         }
 
         .folder-chevron {
@@ -1092,52 +1096,289 @@
 
         <!-- Main Content -->
         <div class="main-content">
-            <!-- Sidebar -->
-            <div class="sidebar" id="sidebar">
-                <div class="sidebar-header">
-                    <div class="sidebar-title">
-                        <i class="fas fa-folder"></i>
-                        <span>EXPLORER</span>
+            <!-- Activity Bar (Narrow Left Sidebar) -->
+            <div class="activity-bar" id="activity-bar">
+                <div class="activity-bar-top">
+                    <div class="activity-item active" data-panel="explorer" title="Explorer">
+                        <i class="fas fa-copy"></i>
                     </div>
-                    <div class="sidebar-actions">
-                        <i class="fas fa-plus" id="new-file-btn" title="New File"></i>
-                        <i class="fas fa-folder-plus" id="new-folder-btn" title="New Folder"></i>
-                        <i class="fas fa-sync-alt" id="refresh-btn" title="Refresh"></i>
-                    </div>
-                </div>
-
-                <div class="sidebar-content" id="file-explorer">
-                    <!-- Workspace info will be inserted here -->
-
-                    <div class="workspace" id="workspace">
-                        <!-- Files and folders will be loaded here -->
-                    </div>
-
-                    <!-- Outline/Structure View -->
-                    <div class="outline-panel">
-                        <div class="outline-header">
-                            <i class="fas fa-list-alt"></i>
-                            <span>OUTLINE</span>
-                        </div>
-                        <div class="outline-content" id="outline-content">
-                            <!-- Code outline will be loaded here -->
-                        </div>
-                    </div>
-                </div>
-
-                <!-- Bottom Tools -->
-                <div class="sidebar-tools">
-                    <div class="tool-item active" title="Explorer">
-                        <i class="fas fa-folder"></i>
-                    </div>
-                    <div class="tool-item" title="Search">
+                    <div class="activity-item" data-panel="search" title="Search">
                         <i class="fas fa-search"></i>
                     </div>
-                    <div class="tool-item" title="Source Control">
-                        <i class="fas fa-code-branch"></i>
+                    <div class="activity-item" data-panel="git" title="Source Control (GitHub)">
+                        <i class="fab fa-github"></i>
                     </div>
-                    <div class="tool-item" title="Extensions">
+                    <div class="activity-item" data-panel="docs" title="Documentation Generator">
+                        <i class="fas fa-book-open"></i>
+                    </div>
+                    <div class="activity-item" data-panel="marketplace" title="Marketplace">
+                        <i class="fas fa-shopping-bag"></i>
+                    </div>
+                    <div class="activity-item" data-panel="extensions" title="Extensions">
                         <i class="fas fa-puzzle-piece"></i>
+                    </div>
+                </div>
+                <div class="activity-bar-bottom">
+                    <div class="activity-item" title="Accounts">
+                        <i class="fas fa-user-circle"></i>
+                    </div>
+                    <div class="activity-item" title="Settings">
+                        <i class="fas fa-cog"></i>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Sidebar -->
+            <div class="sidebar" id="sidebar">
+                <!-- Explorer Panel -->
+                <div class="sidebar-panel active" id="explorer-panel">
+                    <div class="sidebar-header">
+                        <div class="sidebar-title">
+                            <i class="fas fa-folder"></i>
+                            <span>EXPLORER</span>
+                        </div>
+                        <div class="sidebar-actions">
+                            <i class="fas fa-plus" id="new-file-btn" title="New File"></i>
+                            <i class="fas fa-folder-plus" id="new-folder-btn" title="New Folder"></i>
+                            <i class="fas fa-sync-alt" id="refresh-btn" title="Refresh"></i>
+                        </div>
+                    </div>
+
+                    <div class="sidebar-content" id="file-explorer">
+                        <div class="workspace" id="workspace">
+                            <!-- Files and folders will be loaded here -->
+                        </div>
+
+                        <!-- Outline/Structure View -->
+                        <div class="outline-panel">
+                            <div class="outline-header">
+                                <i class="fas fa-list-alt"></i>
+                                <span>OUTLINE</span>
+                            </div>
+                            <div class="outline-content" id="outline-content">
+                                <!-- Code outline will be loaded here -->
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Source Control Panel (GitHub) -->
+                <div class="sidebar-panel" id="git-panel" style="display: none;">
+                    <div class="sidebar-header">
+                        <div class="sidebar-title">
+                            <i class="fab fa-github"></i>
+                            <span>SOURCE CONTROL</span>
+                        </div>
+                        <div class="sidebar-actions">
+                            <i class="fas fa-key" id="git-config-btn" title="Git Credentials"></i>
+                        </div>
+                    </div>
+
+                    <div class="sidebar-content git-panel-content">
+                        <!-- Initial State: No Repo -->
+                        <div id="git-no-repo-view" style="display: none;">
+                            <div class="empty-state">
+                                <i class="fas fa-folder-open"
+                                    style="font-size: 32px; margin-bottom: 10px; opacity: 0.5;"></i>
+                                <p>The current folder is not a Git repository.</p>
+                                <button class="btn-primary btn-full" id="git-init-btn" style="margin-top: 15px;">
+                                    Initialize Repository
+                                </button>
+                            </div>
+                        </div>
+
+                        <!-- Main Git View -->
+                        <div id="git-main-view">
+                            <div class="git-section">
+                                <div class="git-input-container">
+                                    <textarea id="git-commit-message"
+                                        placeholder="Message (Ctrl+Enter to commit)"></textarea>
+                                    <button class="btn-primary btn-full" id="git-commit-btn">
+                                        <i class="fas fa-check"></i> Commit
+                                    </button>
+                                </div>
+                            </div>
+
+                            <div class="git-actions-grid">
+                                <button class="git-action-btn" id="git-pull-btn">
+                                    <i class="fas fa-arrow-down"></i>
+                                    <span>Pull</span>
+                                </button>
+                                <button class="git-action-btn" id="git-push-btn">
+                                    <i class="fas fa-arrow-up"></i>
+                                    <span>Push</span>
+                                </button>
+                                <button class="git-action-btn" id="git-sync-btn">
+                                    <i class="fas fa-sync"></i>
+                                    <span>Sync</span>
+                                </button>
+                            </div>
+
+                            <div class="git-section">
+                                <div class="git-section-header">
+                                    <span>BRANCHES</span>
+                                    <i class="fas fa-plus" id="git-new-branch-btn" title="Create New Branch"
+                                        style="cursor: pointer;"></i>
+                                </div>
+                                <div class="git-list" id="git-branch-list">
+                                    <!-- Branches will be loaded here -->
+                                </div>
+                            </div>
+
+                            <div class="git-section">
+                                <div class="git-section-header">
+                                    <span>HISTORY & GRAPH</span>
+                                    <i class="fas fa-sync" id="git-refresh-history" title="Refresh History"
+                                        style="cursor: pointer; font-size: 10px;"></i>
+                                </div>
+                                <div class="git-history-container" id="git-history-list"
+                                    style="max-height: 250px; overflow-y: auto;">
+                                    <!-- Git graph and commits here -->
+                                </div>
+                            </div>
+
+                            <div class="git-section" id="git-conflict-section" style="display: none;">
+                                <div class="git-section-header" style="color: #f14c4c;">
+                                    <span>MERGE CONFLICTS</span>
+                                    <button class="btn-primary" id="git-ai-resolve-btn"
+                                        style="padding: 2px 8px; font-size: 10px;">
+                                        AI Resolve
+                                    </button>
+                                </div>
+                                <div class="git-list" id="git-conflict-list">
+                                    <!-- Conflict files -->
+                                </div>
+                            </div>
+
+                            <div class="git-section">
+                                <div class="git-section-header">
+                                    <span>CHANGES</span>
+                                    <span class="git-badge" id="git-change-count">0</span>
+                                </div>
+                                <div class="git-list" id="git-changes-list">
+                                    <!-- Changes will be listed here -->
+                                    <div class="empty-state">No staged changes</div>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Config/Credentials View -->
+                        <div id="git-config-view" style="display: none;">
+                            <div class="git-section">
+                                <div class="git-section-header">
+                                    <span>GITHUB CREDENTIALS</span>
+                                    <i class="fas fa-times" id="close-git-config" style="cursor: pointer;"></i>
+                                </div>
+                                <div class="git-config-container" style="padding: 10px 0;">
+                                    <label style="font-size: 11px; color: var(--text-secondary);">Personal Access
+                                        Token</label>
+                                    <input type="password" id="git-token-input" placeholder="ghp_xxxxxxxxxxxx"
+                                        style="width: 100%; padding: 8px; background: var(--bg-primary); border: 1px solid var(--border-color); color: var(--text-primary); border-radius: 4px; margin-top: 5px;">
+                                    <p style="font-size: 10px; color: var(--text-tertiary); margin-top: 8px;">
+                                        Required for Push/Pull. Create one in GitHub Settings > Developer Settings.
+                                    </p>
+                                    <button class="btn-primary btn-full" id="save-git-config" style="margin-top: 15px;">
+                                        Save Credentials
+                                    </button>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Search Panel -->
+                <div class="sidebar-panel" id="search-panel" style="display: none;">
+                    <div class="sidebar-header">
+                        <div class="sidebar-title">
+                            <i class="fas fa-search"></i>
+                            <span>SEARCH</span>
+                        </div>
+                    </div>
+                    <div class="sidebar-content">
+                        <div class="search-container">
+                            <input type="text" id="global-search-input" placeholder="Search">
+                            <input type="text" id="global-replace-input" placeholder="Replace">
+                        </div>
+                        <div class="search-results" id="search-results-list">
+                            <div class="empty-state">Search in your codebase</div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Documentation Panel -->
+                <div class="sidebar-panel" id="docs-panel" style="display: none;">
+                    <div class="sidebar-header">
+                        <div class="sidebar-title">
+                            <i class="fas fa-book"></i>
+                            <span>DOCUMENTATION</span>
+                        </div>
+                    </div>
+                    <div class="sidebar-content">
+                        <div class="doc-tools" style="padding: 15px;">
+                            <button class="btn-primary btn-full" id="gen-project-docs" style="margin-bottom: 10px;">
+                                <i class="fas fa-globe"></i> Generate Project Wiki
+                            </button>
+                            <button class="btn-secondary btn-full" id="gen-file-docs">
+                                <i class="fas fa-file-alt"></i> Document Current File
+                            </button>
+                        </div>
+                        <div id="docs-container" class="markdown-body"
+                            style="padding: 15px; font-size: 13px; color: var(--text-primary); overflow-y: auto; max-height: calc(100vh - 200px);">
+                            <div class="empty-state">Generate documentation to see it here</div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Marketplace Panel -->
+                <div class="sidebar-panel" id="marketplace-panel" style="display: none;">
+                    <div class="sidebar-header">
+                        <div class="sidebar-title">
+                            <i class="fas fa-shopping-bag"></i>
+                            <span>MARKETPLACE</span>
+                        </div>
+                    </div>
+                    <div class="sidebar-content" style="padding: 10px;">
+                        <input type="text" placeholder="Search Extensions..." class="modern-input"
+                            style="width: 100%; margin-bottom: 15px; padding: 10px; border-radius: 8px; background: rgba(255,255,255,0.05); border: 1px solid var(--border-color); color: white;">
+                        <div class="marketplace-list" id="marketplace-list">
+                            <!-- Premium Dummy Icons -->
+                            <div class="marketplace-item glass hover-lift"
+                                style="margin-bottom: 12px; padding: 12px; border-radius: 12px; display: flex; gap: 12px; align-items: center; cursor: pointer; transition: all 0.3s; border: 1px solid rgba(255,255,255,0.05);">
+                                <div
+                                    style="width: 42px; height: 42px; background: linear-gradient(135deg, #007acc, #4ec9b0); border-radius: 10px; display: flex; align-items: center; justify-content: center; font-size: 20px; color: white;">
+                                    <i class="fas fa-bolt"></i>
+                                </div>
+                                <div>
+                                    <div style="font-weight: 600; font-size: 13px; color: white;">Turbo Context</div>
+                                    <div style="font-size: 11px; opacity: 0.6; color: #ccc;">Smart AI context management
+                                    </div>
+                                </div>
+                            </div>
+                            <div class="marketplace-item glass hover-lift"
+                                style="margin-bottom: 12px; padding: 12px; border-radius: 12px; display: flex; gap: 12px; align-items: center; cursor: pointer; transition: all 0.3s; border: 1px solid rgba(255,255,255,0.05);">
+                                <div
+                                    style="width: 42px; height: 42px; background: linear-gradient(135deg, #ffbd2e, #ff5f56); border-radius: 10px; display: flex; align-items: center; justify-content: center; font-size: 20px; color: white;">
+                                    <i class="fas fa-palette"></i>
+                                </div>
+                                <div>
+                                    <div style="font-weight: 600; font-size: 13px; color: white;">Neon Dreams</div>
+                                    <div style="font-size: 11px; opacity: 0.6; color: #ccc;">Premium glassmorphism theme
+                                    </div>
+                                </div>
+                            </div>
+                            <div class="marketplace-item glass hover-lift"
+                                style="margin-bottom: 12px; padding: 12px; border-radius: 12px; display: flex; gap: 12px; align-items: center; cursor: pointer; transition: all 0.3s; border: 1px solid rgba(255,255,255,0.05);">
+                                <div
+                                    style="width: 42px; height: 42px; background: linear-gradient(135deg, #c586c0, #007acc); border-radius: 10px; display: flex; align-items: center; justify-content: center; font-size: 20px; color: white;">
+                                    <i class="fas fa-shield-alt"></i>
+                                </div>
+                                <div>
+                                    <div style="font-weight: 600; font-size: 13px; color: white;">Zenith Security</div>
+                                    <div style="font-size: 11px; opacity: 0.6; color: #ccc;">Vulnerability scanner for
+                                        AI</div>
+                                </div>
+                            </div>
+                        </div>
                     </div>
                 </div>
             </div>
@@ -1150,6 +1391,9 @@
                         <!-- Tabs are created dynamically via JavaScript -->
                     </div>
                     <div class="tab-actions">
+                        <div class="tab-action-btn" id="live-preview-btn" title="Toggle Live Preview">
+                            <i class="fas fa-eye"></i>
+                        </div>
                         <div class="tab-action-btn" id="split-editor-btn" title="Split Editor">
                             <i class="fas fa-columns"></i>
                         </div>
@@ -1161,8 +1405,29 @@
 
                 <!-- Editor Area -->
                 <div class="editor-area" id="editor-area">
-                    <div class="editor-wrapper">
-                        <div id="editor" class="monaco-editor"></div>
+                    <div class="main-editor-view"
+                        style="flex: 1; display: flex; flex-direction: row; overflow: hidden; min-height: 0;">
+                        <div class="editor-wrapper" id="main-editor-wrapper" style="flex: 1; position: relative;">
+                            <div id="editor" class="monaco-editor"></div>
+                        </div>
+
+                        <!-- Live Preview Panel (Right Side of Editor) -->
+                        <div class="live-preview-panel" id="live-preview-panel"
+                            style="display: none; width: 45%; border-left: 1px solid var(--border-color); flex-shrink: 0; background: white; flex-direction: column;">
+                            <div class="preview-header"
+                                style="height: 35px; background: #2d2d2d; color: #ccc; display: flex; align-items: center; justify-content: space-between; padding: 0 15px; border-bottom: 1px solid var(--border-color); font-weight: 600; font-size: 11px; letter-spacing: 0.5px;">
+                                <span><i class="fas fa-globe" style="color: var(--accent-blue); margin-right: 8px;"></i>
+                                    LIVE PREVIEW</span>
+                                <div class="preview-actions" style="display: flex; gap: 12px;">
+                                    <i class="fas fa-redo-alt" id="refresh-preview" style="cursor: pointer;"
+                                        title="Refresh"></i>
+                                    <i class="fas fa-external-link-alt" id="open-external-preview"
+                                        style="cursor: pointer;" title="Open in Browser"></i>
+                                </div>
+                            </div>
+                            <iframe id="preview-iframe"
+                                style="width: 100%; height: calc(100% - 35px); border: none; background: white;"></iframe>
+                        </div>
                     </div>
 
                     <!-- Terminal Panel -->
@@ -1295,9 +1560,11 @@
                                 <button class="ai-chat-action-btn" id="attach-file-btn" title="Attach File">
                                     <i class="fas fa-paperclip"></i>
                                 </button>
-                                <div class="ai-rag-toggle" style="display: flex; align-items: center; margin: 0 10px; font-size: 11px; color: #858585;">
+                                <div class="ai-rag-toggle"
+                                    style="display: flex; align-items: center; margin: 0 10px; font-size: 11px; color: #858585;">
                                     <input type="checkbox" id="rag-toggle" style="margin-right: 5px;">
-                                    <label for="rag-toggle" title="Search entire codebase" style="cursor: pointer;">Search Codebase</label>
+                                    <label for="rag-toggle" title="Search entire codebase"
+                                        style="cursor: pointer;">Search Codebase</label>
                                 </div>
                                 <button class="ai-chat-action-btn" id="clear-chat-btn" title="Clear Chat">
                                     <i class="fas fa-trash"></i>
@@ -1363,12 +1630,42 @@
             </div>
         </div>
 
+        <!-- Checkout Options Dialog -->
+        <div class="dialog" id="git-checkout-dialog" style="display: none;">
+            <div class="dialog-content">
+                <h3><i class="fas fa-exchange-alt"></i> Uncommitted Changes</h3>
+                <p>How would you like to handle your current changes?</p>
+                <div class="dialog-buttons" style="flex-direction: column; gap: 10px;">
+                    <button class="btn-primary" id="checkout-bring" style="width: 100%;">
+                        Bring Changes (Keep Unstaged)
+                    </button>
+                    <button class="btn-secondary" id="checkout-stash" style="width: 100%;">
+                        Stash & Switch (Clean Start)
+                    </button>
+                    <button class="btn-secondary" id="checkout-cancel" style="width: 100%;">
+                        Cancel Switch
+                    </button>
+                </div>
+            </div>
+        </div>
+
+        <!-- New Branch Dialog -->
+        <div class="dialog" id="new-branch-dialog" style="display: none;">
+            <div class="dialog-content">
+                <h3><i class="fas fa-code-branch"></i> Create New Branch</h3>
+                <input type="text" id="new-branch-input" placeholder="Enter branch name (e.g. feature-login)">
+                <div class="dialog-buttons">
+                    <button class="btn-secondary" id="new-branch-cancel">Cancel</button>
+                    <button class="btn-primary" id="new-branch-confirm">Create Branch</button>
+                </div>
+            </div>
+        </div>
+
         <!-- New Folder Dialog -->
         <div class="dialog" id="new-folder-dialog" style="display: none;">
             <div class="dialog-content">
                 <h3><i class="fas fa-folder-plus"></i> New Folder</h3>
-                <input type="text" id="new-folder-input" placeholder="Enter folder name"
-                    value="new_folder">
+                <input type="text" id="new-folder-input" placeholder="Enter folder name" value="new_folder">
                 <div class="dialog-buttons">
                     <button class="btn-secondary" id="new-folder-cancel">Cancel</button>
                     <button class="btn-primary" id="new-folder-confirm">Create</button>
