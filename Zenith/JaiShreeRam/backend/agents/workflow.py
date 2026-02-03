@@ -499,8 +499,6 @@ class MultiFileEditWorkflow:
         state["plan"] = response.content
         return state
 
-
-
     def _generate_content(self, state: EditState) -> EditState:
         """Generate the new content for each file"""
         logger.info("Generating content")

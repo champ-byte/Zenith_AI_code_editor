@@ -1295,10 +1295,18 @@
                                 <button class="ai-chat-action-btn" id="attach-file-btn" title="Attach File">
                                     <i class="fas fa-paperclip"></i>
                                 </button>
-                                <div class="ai-rag-toggle" style="display: flex; align-items: center; margin: 0 10px; font-size: 11px; color: #858585;">
-                                    <input type="checkbox" id="rag-toggle" style="margin-right: 5px;">
-                                    <label for="rag-toggle" title="Search entire codebase" style="cursor: pointer;">Search Codebase</label>
+                                <!-- Mode Switcher -->
+                                <div class="mode-switch-container" style="display: flex; background: #2d2d2d; border-radius: 6px; padding: 2px; margin-right: 10px;">
+                                    <button class="mode-btn active" id="mode-chat" onclick="codeEditor.setChatMode('chat')" title="RAG Chat Mode"
+                                        style="border: none; background: #007acc; color: white; padding: 4px 12px; border-radius: 4px; font-size: 11px; cursor: pointer; transition: all 0.2s;">
+                                        Chat
+                                    </button>
+                                    <button class="mode-btn" id="mode-agent" onclick="codeEditor.setChatMode('agent')" title="Agentic Edit Mode"
+                                        style="border: none; background: transparent; color: #858585; padding: 4px 12px; border-radius: 4px; font-size: 11px; cursor: pointer; transition: all 0.2s;">
+                                        Agent
+                                    </button>
                                 </div>
+                                
                                 <button class="ai-chat-action-btn" id="clear-chat-btn" title="Clear Chat">
                                     <i class="fas fa-trash"></i>
                                 </button>

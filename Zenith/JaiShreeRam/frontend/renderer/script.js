@@ -23,6 +23,7 @@ class CodeEditor {
         this.pendingEdits = []; // Store edits for review
         this.diffEditor = null; // Monaco Diff Editor instance
         
+        this.currentMode = 'chat'; // 'chat' or 'agent'
         this.init();
     }
 
@@ -218,15 +219,7 @@ class CodeEditor {
             this.showAISettings();
         });
 
-        // RAG Toggle Logic
-        const ragToggle = document.getElementById('rag-toggle');
-        if (ragToggle) {
-            ragToggle.addEventListener('change', (e) => {
-                if (e.target.checked) {
-                    this.indexCodebase();
-                }
-            });
-        }
+
 
         // AI Quick Actions
         document.querySelectorAll('.ai-action-btn').forEach(btn => {
@@ -1451,9 +1444,14 @@ class CodeEditor {
     this.aiChatHistory = [];
     
     const ragToggle = document.getElementById('rag-toggle');
-    if (ragToggle) ragToggle.checked = false;
+    if (ragToggle) ragToggle.checked = true;
     
-    window.electronAPI.resetRAGIndex().catch(err => console.error('Failed to reset RAG:', err));
+    try {
+        await window.electronAPI.resetRAGIndex();
+        this.indexCodebase(); // Trigger indexing (async)
+    } catch (err) {
+        console.error('Failed to reset RAG:', err);
+    }
 
     // Use the folder structure if provided
         if (folderStructure) {
@@ -1834,75 +1832,7 @@ class CodeEditor {
         }
     }
 
-    async handleMultiFileEdit(task) {
-        console.log("HandleMultiFileEdit: Starting Native Diff Workflow");
-        
-        // create a placeholder message for progress updates
-        const progressId = 'progress-' + Date.now();
-        this.addAIMessage('ai', '<span id="' + progressId + '">Analyzing request...</span>');
-        
-        // Start progress simulation
-        const stopProgress = this.simulateProgress(progressId);
-        
-        try {
-            const files = Array.from(this.tabs.keys());
-            
-            const result = await window.electronAPI.invoke('agent-edit', {
-                task: task,
-                files: files
-            });
 
-            // Stop progress simulation
-            stopProgress();
-
-            if (result.success) {
-                // Remove the progress message or update it to the result
-                const progressElement = document.getElementById(progressId);
-                if (progressElement) {
-                     // Find the parent message div and remove it to avoid clutter, 
-                     // OR update it. Let's remove it and add the real response.
-                     const messageDiv = progressElement.closest('.message');
-                     if (messageDiv) messageDiv.remove();
-                }
-
-                // If there are edits, show the full UI
-                // If there are edits, show the full UI
-                if (result.edits && result.edits.length > 0) {
-                    this.addAIMessage('ai', `**Plan Created:**\n\n${result.plan}\n\nI have proposed edits for ${result.edits.length} files. Opening files for review...`);
-                    
-                    // Auto-open diffs in native tabs
-                    this.currentEdits = result.edits;
-                    for (const edit of result.edits) {
-                        await this.openEditAsDiff(edit);
-                    }
-                    
-                    // Add "Apply" action to chat
-                    this.addChatAction('Apply All Changes', () => this.applyAllEdits(result.edits));
-                } else {
-                    // No edits, treat as a normal chat response (using the plan as the response)
-                    // The backend typically returns the LLM response in 'plan' if no edits were found
-                    this.addAIMessage('ai', result.plan || "I processed your request but found no changes needed.");
-                }
-                
-            } else {
-                const progressElement = document.getElementById(progressId);
-                if (progressElement) {
-                     const messageDiv = progressElement.closest('.message');
-                     if (messageDiv) messageDiv.remove();
-                }
-                this.addAIMessage('ai', `**Error:** Failed to generate response: ${result.error}`);
-            }
-        } catch (error) {
-             stopProgress();
-             const progressElement = document.getElementById(progressId);
-             if (progressElement) {
-                  const messageDiv = progressElement.closest('.message');
-                  if (messageDiv) messageDiv.remove();
-             }
-             this.showNotification(`Error: ${error.message}`, 'error');
-             this.addAIMessage('ai', `**System Error:** ${error.message}`);
-        }
-    }
 
     simulateProgress(elementId) {
         const phases = [
@@ -2015,6 +1945,34 @@ class CodeEditor {
         }
     }
 
+    setChatMode(mode) {
+        this.currentMode = mode;
+        
+        // Update UI
+        const chatBtn = document.getElementById('mode-chat');
+        const agentBtn = document.getElementById('mode-agent');
+        
+        if (chatBtn && agentBtn) {
+            if (mode === 'chat') {
+                chatBtn.classList.add('active');
+                chatBtn.style.background = '#007acc';
+                chatBtn.style.color = 'white';
+                
+                agentBtn.classList.remove('active');
+                agentBtn.style.background = 'transparent';
+                agentBtn.style.color = '#858585';
+            } else {
+                agentBtn.classList.add('active');
+                agentBtn.style.background = '#4ec9b0';
+                agentBtn.style.color = '#1e1e1e';
+                
+                chatBtn.classList.remove('active');
+                chatBtn.style.background = 'transparent';
+                chatBtn.style.color = '#858585';
+            }
+        }
+    }
+
     async sendAIMessage() {
         const input = document.getElementById('ai-input');
         if (!input) {
@@ -2041,6 +1999,7 @@ class CodeEditor {
         this.showAITypingIndicator();
 
         try {
+            console.log("DEBUG: sendAIMessage Mode:", this.currentMode);
             const messages = document.getElementById('ai-chat-messages');
             const history = [];
             if (messages) {
@@ -2064,8 +2023,7 @@ class CodeEditor {
             const language = this.getLanguageFromExtension(this.currentFile || 'script.js');
 
             // Check for RAG toggle
-            const ragToggle = document.getElementById('rag-toggle');
-            const useRag = ragToggle ? ragToggle.checked : false;
+            const useRag = !!this.workspacePath;
 
             const context = {
                 current_code: code.substring(0, 1000),
@@ -2074,10 +2032,24 @@ class CodeEditor {
                 use_rag: useRag
             };
             
-            // ALWAYS use the Multi-File Edit/Agent Workflow
-            this.hideAITypingIndicator();
-            await this.handleMultiFileEdit(message);
-            return;
+            // Check Mode
+            if (this.currentMode === 'agent') {
+                // Agent Mode: Use Multi-File Workflow
+                this.hideAITypingIndicator();
+                await this.handleMultiFileEdit(message);
+                return;
+            } else {
+                // Chat Mode: Use Standard RAG Chat
+                const response = await window.electronAPI.chat(message, history, context);
+                this.hideAITypingIndicator();
+
+                if (response.success) {
+                    this.addAIMessage('ai', response.response);
+                } else {
+                    this.addAIMessage('ai', `**Error:** ${response.error}`);
+                }
+                return;
+            }
 
 
 
@@ -2120,7 +2092,7 @@ class CodeEditor {
             
             console.log('Sending multi-file edit request:', { task, files: contextFiles });
             
-            this.addAIMessage('ai', `🧠 **Generating Plan & Edits...**\n\n*Analyzing ${contextFiles.length} files with RAG & Tree-sitter...*`);
+            this.addAIMessage('ai', `Analyzing request...`);
             this.showAITypingIndicator();
 
             const result = await window.electronAPI.multiFileEdit(task, contextFiles);
@@ -2370,6 +2342,9 @@ class CodeEditor {
         }
         
         this.showNotification('All edits applied successfully', 'success');
+        
+        // Auto-reindex after changes
+        this.indexCodebase();
     }
     
     rejectEdits() {
@@ -2390,12 +2365,6 @@ class CodeEditor {
 
         // Visual feedback on the toggle label or notification
         this.showNotification('Indexing codebase...', 'info');
-        const ragToggle = document.getElementById('rag-toggle');
-        const label = document.querySelector('label[for="rag-toggle"]');
-        const originalText = label ? label.textContent : 'Search Codebase';
-        
-        if (label) label.textContent = 'Indexing...';
-
         try {
             const result = await window.electronAPI.indexCodebase(this.workspacePath);
             
@@ -2403,13 +2372,9 @@ class CodeEditor {
                 this.showNotification(`Indexed ${result.files} files`, 'success');
             } else {
                 this.showNotification(`Indexing failed: ${result.error}`, 'error');
-                if (ragToggle) ragToggle.checked = false;
             }
         } catch (error) {
             this.showNotification(`Indexing error: ${error.message}`, 'error');
-            if (ragToggle) ragToggle.checked = false;
-        } finally {
-            if (label) label.textContent = originalText;
         }
     }
 

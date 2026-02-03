@@ -48,5 +48,8 @@
     "linux": {
       "target": "AppImage"
     }
+  },
+  "dependencies": {
+    "simple-git": "^3.30.0"
   }
 }

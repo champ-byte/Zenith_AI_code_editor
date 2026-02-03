@@ -206,9 +206,10 @@ Provide both the optimized code and explanation of changes.
         try:
             self._ensure_configured()
             messages = []
-            system_content = """You are an AI coding assistant. You help with code generation, explanation, debugging, optimization, and answering questions.
-Be helpful, accurate, and provide code examples when needed.
-Format code blocks with proper syntax highlighting.
+            system_content = """You are an AI coding assistant. You help by answering questions about the codebase.
+Your goal is to explain concepts clearly in text.Be helpful, accurate.
+DO NOT generate code blocks or implementation examples.
+Focus on high-level explanations, logic, and architecture.
 """
             if context:
                 # Special handling for RAG components
