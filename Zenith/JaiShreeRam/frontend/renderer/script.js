@@ -18,13 +18,11 @@ class CodeEditor {
         this.fileSystemWatchers = new Map();
         this.autoSaveEnabled = true;
         this.isWindows = navigator.platform.indexOf('Win') > -1;
+
+        this.isWindows = navigator.platform.indexOf('Win') > -1;
         this.pendingEdits = []; // Store edits for review
         this.diffEditor = null; // Monaco Diff Editor instance
-<<<<<<< HEAD
-        this.currentMode = 'chat'; // 'chat' or 'agent'
-=======
 
->>>>>>> origin/main
         this.init();
     }
 
@@ -523,310 +521,6 @@ class CodeEditor {
             });
         }
 
-<<<<<<< HEAD
-        console.log('Event listeners setup complete');
-    }
-
-    showPanel(panelId) {
-        console.log(`Switching to panel: ${panelId}`);
-        // Update activity bar
-        document.querySelectorAll('.activity-item').forEach(item => {
-            if (item.dataset.panel === panelId) {
-                item.classList.add('active');
-            } else {
-                item.classList.remove('active');
-            }
-        });
-
-        // Update sidebar panels
-        document.querySelectorAll('.sidebar-panel').forEach(panel => {
-            if (panel.id === `${panelId}-panel`) {
-                panel.style.display = 'flex';
-                panel.classList.add('active');
-
-                // Special handling for panels if needed
-                if (panelId === 'git') {
-                    this.updateGitStatus();
-                } else if (panelId === 'marketplace') {
-                    // Load popular extensions if list is empty or dummy
-                    const list = document.getElementById('marketplace-list');
-                    if (list && list.children.length > 0 && list.children[0].textContent.includes('Turbo Context')) {
-                        this.searchExtensions(''); // Load default/popular
-                    }
-                }
-            } else {
-                panel.style.display = 'none';
-                panel.classList.remove('active');
-            }
-        });
-    }
-
-    async handleGitAction(action, data = null) {
-        console.log(`Git action: ${action}`, data);
-
-        // Check for token on push/pull/sync
-        if (['push', 'pull', 'sync'].includes(action)) {
-            const token = localStorage.getItem('github_token');
-            if (!token) {
-                this.addAIMessage('ai', `⚠️ GitHub Token required for ${action}. Please click the 🔑 icon in Source Control to set it.`);
-                this.showNotification(`GitHub Token required for ${action}`, 'warning');
-                return;
-            }
-            data = { token }; // Pass token in data
-        }
-
-        this.addAIMessage('ai', `🌐 Performing Git ${action}...`);
-
-        try {
-            // Check if directory is a git repo
-            const status = await window.electronAPI.invoke('git-action', { action: 'status', path: this.workspacePath });
-
-            if (!status.success && action !== 'init') {
-                this.addAIMessage('ai', `❌ Not a git repository. Would you like to initialize one?`);
-                return;
-            }
-
-            const result = await window.electronAPI.invoke('git-action', {
-                action,
-                data,
-                path: this.workspacePath
-            });
-
-            if (result.success) {
-                this.addAIMessage('ai', `✅ Git ${action} successful! ${result.message || ''}`);
-                this.updateGitStatus();
-                this.showNotification(`Git ${action} successful`, 'success');
-            } else {
-                this.addAIMessage('ai', `❌ Git ${action} failed: ${result.error}`);
-                this.showNotification(`Git ${action} failed`, 'error');
-            }
-        } catch (error) {
-            console.error(`Git ${action} error:`, error);
-            this.addAIMessage('ai', `❌ Error performing Git action: ${error.message}`);
-        }
-    }
-
-    async updateGitStatus() {
-        if (!this.workspacePath) return;
-
-        // Reset views
-        document.getElementById('git-config-view').style.display = 'none';
-
-        try {
-            const result = await window.electronAPI.invoke('git-action', {
-                action: 'status',
-                path: this.workspacePath
-            });
-
-            if (result.success) {
-                document.getElementById('git-main-view').style.display = 'block';
-                document.getElementById('git-no-repo-view').style.display = 'none';
-
-                const branchStatus = document.getElementById('branch-status');
-                if (branchStatus) {
-                    branchStatus.querySelector('span').textContent = result.branch || 'main';
-                }
-
-                const changeCount = document.getElementById('git-change-count');
-                if (changeCount) {
-                    changeCount.textContent = result.files ? result.files.length : 0;
-                }
-
-                // Update Changes List
-                const changesList = document.getElementById('git-changes-list');
-                if (changesList) {
-                    if (result.files && result.files.length > 0) {
-                        changesList.innerHTML = result.files.map(file => `
-                            <div class="git-list-item">
-                                <i class="fas ${file.isConflict ? 'fa-exclamation-triangle' : 'fa-file'}"></i>
-                                <span>${file.path}</span>
-                                <span class="git-badge ${file.isConflict ? 'conflict' : ''}">${file.status}</span>
-                            </div>
-                        `).join('');
-                    } else {
-                        changesList.innerHTML = '<div class="empty-state">No changes detected</div>';
-                    }
-                }
-
-                // Handle Conflicts
-                const conflictSection = document.getElementById('git-conflict-section');
-                const conflictList = document.getElementById('git-conflict-list');
-                const conflicts = result.files ? result.files.filter(f => f.isConflict) : [];
-
-                if (conflicts.length > 0) {
-                    conflictSection.style.display = 'block';
-                    conflictList.innerHTML = conflicts.map(f => `
-                        <div class="git-list-item conflict">
-                            <i class="fas fa-exclamation-circle" style="color: #f14c4c;"></i>
-                            <span>${f.path}</span>
-                        </div>
-                    `).join('');
-                } else {
-                    conflictSection.style.display = 'none';
-                }
-
-                // Update branches and history
-                this.updateGitBranches();
-                this.updateGitHistory();
-            } else {
-                // Not a repo
-                document.getElementById('git-main-view').style.display = 'none';
-                document.getElementById('git-no-repo-view').style.display = 'block';
-            }
-        } catch (error) {
-            console.error('Error updating git status:', error);
-        }
-    }
-
-    async updateGitBranches() {
-        if (!this.workspacePath) return;
-        try {
-            const result = await window.electronAPI.invoke('git-action', { action: 'branches', path: this.workspacePath });
-            if (result.success) {
-                const branchList = document.getElementById('git-branch-list');
-                if (branchList) {
-                    branchList.innerHTML = result.all.map(b => `
-                        <div class="git-list-item ${b === result.current ? 'active' : ''}" data-branch="${b}" style="cursor: pointer;">
-                            <i class="fas fa-code-branch"></i>
-                            <span>${b}</span>
-                            ${b === result.current ? '<span class="git-badge">current</span>' : ''}
-                        </div>
-                    `).join('');
-
-                    // Add click listeners
-                    branchList.querySelectorAll('.git-list-item').forEach(item => {
-                        item.onclick = () => this.checkoutBranch(item.dataset.branch);
-                    });
-                }
-            }
-        } catch (error) {
-            console.error('Error fetching branches:', error);
-        }
-    }
-
-    async checkoutBranch(name) {
-        this.checkChangesAndPerform('checkout', name);
-    }
-
-    async checkChangesAndPerform(action, branchName) {
-        // Check for uncommitted changes first
-        const statusResult = await window.electronAPI.invoke('git-action', { action: 'status', path: this.workspacePath });
-        if (statusResult.success && statusResult.files && statusResult.files.length > 0) {
-            const dialog = document.getElementById('git-checkout-dialog');
-            const bringBtn = document.getElementById('checkout-bring');
-            const stashBtn = document.getElementById('checkout-stash');
-
-            bringBtn.dataset.action = action;
-            bringBtn.dataset.branch = branchName;
-            stashBtn.dataset.action = action;
-            stashBtn.dataset.branch = branchName;
-
-            dialog.style.display = 'flex';
-            return;
-        }
-
-        // No changes, just perform action
-        this.performBranchAction(action, branchName);
-    }
-
-    async performBranchAction(action, name, options = {}) {
-        const displayAction = action === 'create-branch' ? 'Creating' : 'Switching to';
-        this.addAIMessage('ai', `🌐 ${displayAction} branch ${name}...`);
-
-        const result = await window.electronAPI.invoke('git-action', {
-            action,
-            path: this.workspacePath,
-            data: { name, ...options }
-        });
-
-        if (result.success) {
-            this.showNotification(result.message, 'success');
-            this.updateGitStatus();
-        } else {
-            this.showNotification(`${action} failed: ${result.error}`, 'error');
-            this.addAIMessage('ai', `❌ ${action} failed: ${result.error}`);
-        }
-    }
-
-    async updateGitHistory() {
-        if (!this.workspacePath) return;
-        try {
-            const result = await window.electronAPI.invoke('git-action', { action: 'log', path: this.workspacePath });
-            if (result.success) {
-                const historyList = document.getElementById('git-history-list');
-                if (historyList) {
-                    historyList.innerHTML = (result.all || []).map((commit, index) => `
-                        <div class="git-history-item" title="${commit.message}">
-                            <div class="git-graph-dot">
-                                <div class="dot"></div>
-                                ${index < (result.all || []).length - 1 ? '<div class="line"></div>' : ''}
-                            </div>
-                            <div class="git-history-details">
-                                <div class="git-commit-msg">${commit.message}</div>
-                                <div class="git-commit-meta">
-                                    <span>${commit.author_name}</span>
-                                    <span class="git-hash">${commit.hash.substring(0, 7)}</span>
-                                </div>
-                            </div>
-                        </div>
-                    `).join('');
-                }
-            }
-        } catch (error) {
-            console.error('Error fetching history:', error);
-        }
-    }
-
-    async resolveGitConflictsWithAI() {
-        this.addAIMessage('ai', '🤖 Analyzing merge conflicts for resolution...');
-        const result = await window.electronAPI.invoke('git-action', { action: 'status', path: this.workspacePath });
-        const conflicts = result.files.filter(f => f.isConflict);
-
-        if (conflicts.length === 0) {
-            this.addAIMessage('ai', 'No conflicts found.');
-            return;
-        }
-
-        for (const file of conflicts) {
-            try {
-                // Read the file with conflict markers
-                const content = await window.electronAPI.invoke('read-file', `${this.workspacePath}/${file.path}`);
-
-                this.addAIMessage('ai', `Resolving ${file.path}...`);
-
-                const response = await fetch('http://127.0.0.1:5000/api/chat', {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({
-                        message: `Merge conflict in file: ${file.path}.\nHere is the content with markers:\n\n${content}\n\nPlease resolve the conflict and provide ONLY the clean resolved code.`,
-                        context: { task: 'resolve_conflict', file: file.path }
-                    })
-                });
-
-                const data = await response.json();
-                if (data.success) {
-                    const resolvedCode = this.extractCodeBlock(data.response);
-                    // Save the resolved code
-                    await window.electronAPI.invoke('save-file', { filePath: `${this.workspacePath}/${file.path}`, content: resolvedCode });
-                    this.addAIMessage('ai', `✅ Resolved conflict in ${file.path}`);
-                }
-            } catch (error) {
-                this.addAIMessage('ai', `❌ Error resolving ${file.path}: ${error.message}`);
-                console.error(`Error resolving conflict in ${file.path}:`, error);
-            }
-        }
-
-        this.updateGitStatus();
-    }
-
-    extractCodeBlock(text) {
-        if (!text) return "";
-        const match = text.match(/```(?:\w+)?\n([\s\S]*?)\n```/);
-        return match ? match[1] : text.trim();
-    }
-
-=======
->>>>>>> origin/main
         console.log('Event listeners setup complete');
     }
 
@@ -1380,16 +1074,6 @@ class CodeEditor {
 
             // Indentation
             const paddingLeft = 10 + (depth * 15);
-<<<<<<< HEAD
-
-            element.innerHTML = `
-                <div class="file-item-content" style="padding-left: ${paddingLeft}px;">
-                    ${child.type === 'folder' ?
-                    `<i class="fas fa-chevron-right folder-chevron" style="transform: ${child.open ? 'rotate(90deg)' : 'rotate(0deg)'}; transition: transform 0.2s;"></i>`
-                    : '<span style="width:16px; margin-right:2px; display:inline-block;"></span>'}
-            const paddingLeft = 10 + (depth * 15); 
-=======
->>>>>>> origin/main
 
             element.innerHTML = `
                 <div class="file-item-content" style="padding-left: ${paddingLeft}px;">
@@ -1524,12 +1208,6 @@ class CodeEditor {
         const originalPath = filePath;
         filePath = this.normalizePath(filePath);
 
-<<<<<<< HEAD
-        const originalPath = filePath; 
-        filePath = this.normalizePath(filePath); 
-        
-=======
->>>>>>> origin/main
         console.log(`Opening file: ${fileName} (${filePath})`);
 
         // IMPORTANT: Save current tab content BEFORE switching
@@ -1542,23 +1220,11 @@ class CodeEditor {
 
         // Stop watching previous file (if switching)
         if (this.currentFile && this.currentFile !== filePath && this.fileSystemWatchers.has(this.currentFile)) {
-<<<<<<< HEAD
-            // Optional: Keep watchers alive for open tabs?
-=======
             // Optional: Keep watchers alive for open tabs? 
->>>>>>> origin/main
             // Current logic closes watcher on switch? That's probably efficient but means background tabs don't update.
             // For now, keep existing behavior but use normalized check
             this.fileSystemWatchers.get(this.currentFile).close();
             this.fileSystemWatchers.delete(this.currentFile);
-<<<<<<< HEAD
-             // Optional: Keep watchers alive for open tabs? 
-             // Current logic closes watcher on switch? That's probably efficient but means background tabs don't update.
-             // For now, keep existing behavior but use normalized check
-             this.fileSystemWatchers.get(this.currentFile).close();
-             this.fileSystemWatchers.delete(this.currentFile);
-=======
->>>>>>> origin/main
         }
 
         this.currentFile = filePath;
@@ -1580,12 +1246,6 @@ class CodeEditor {
             // Only update content if provided (don't overwrite with empty if undefined)
             if (content !== undefined) {
                 tabInfo.content = content;
-<<<<<<< HEAD
-            } else if (tabInfo.content === undefined) {
-                tabInfo.content = '';
-                 tabInfo.content = content;
-=======
->>>>>>> origin/main
             } else if (tabInfo.content === undefined) {
                 tabInfo.content = '';
             }
@@ -1781,16 +1441,6 @@ class CodeEditor {
                 if (this.editor) {
                     const contentToSet = tabInfo.content !== undefined ? tabInfo.content : '';
 
-<<<<<<< HEAD
-                    // Only setValue if it's different to prevent cursor jumping or unnecessary updates
-                    // But if we are refreshing after edit, we MUST update.
-                    // editor.getValue() might be stale if we just hid diff view.
-
-                    if (this.editor.getValue() !== contentToSet) {
-                        this.editor.setValue(contentToSet);
-                    
-=======
->>>>>>> origin/main
                     // Only setValue if it's different to prevent cursor jumping or unnecessary updates
                     // But if we are refreshing after edit, we MUST update.
                     // editor.getValue() might be stale if we just hid diff view.
@@ -1866,15 +1516,6 @@ class CodeEditor {
         acceptBtn.innerHTML = '<i class="fas fa-check"></i> Accept';
         acceptBtn.onclick = () => this.applySingleEdit(edit);
 
-<<<<<<< HEAD
-        const rejectBtn = document.createElement('button');
-        rejectBtn.className = 'diff-overlay-btn btn-reject-change';
-        rejectBtn.innerHTML = '<i class="fas fa-times"></i> Reject';
-        rejectBtn.onclick = () => this.rejectSingleEdit(edit);
-
-        
-=======
->>>>>>> origin/main
         const rejectBtn = document.createElement('button');
         rejectBtn.className = 'diff-overlay-btn btn-reject-change';
         rejectBtn.innerHTML = '<i class="fas fa-times"></i> Reject';
@@ -1902,24 +1543,6 @@ class CodeEditor {
             // Normalize properly
             let editPath = this.normalizePath(edit.file_path);
 
-<<<<<<< HEAD
-            // Determine effective file path
-            let targetPath = edit.file_path; // Keep original for FS ops
-
-            const isNew = edit.is_new;
-            if (isNew) {
-                const fileName = this.getFileNameFromPath(edit.file_path);
-
-                targetPath = await window.electronAPI.createFile({
-                    folderPath: this.workspacePath,
-                    fileName: fileName
-                });
-                console.log(`Created new file at: ${targetPath}`);
-            }
-
-            
-=======
->>>>>>> origin/main
             // Determine effective file path
             let targetPath = edit.file_path; // Keep original for FS ops
 
@@ -1946,12 +1569,6 @@ class CodeEditor {
                 // Try finding by fuzzy match or original?
                 // If not found, check if we have it under original
                 if (this.tabs.has(edit.file_path)) tabFilePath = edit.file_path;
-<<<<<<< HEAD
-                 // Try finding by fuzzy match or original?
-                 // If not found, check if we have it under original
-                 if (this.tabs.has(edit.file_path)) tabFilePath = edit.file_path;
-=======
->>>>>>> origin/main
             }
 
             if (this.tabs.has(tabFilePath)) {
@@ -1969,28 +1586,6 @@ class CodeEditor {
                         this.editor.setValue(edit.new_content);
                     }
 
-<<<<<<< HEAD
-                    // Hide Diff View Manually
-                    const diffContainer = document.getElementById('diff-editor-container-tab');
-                    if (diffContainer) diffContainer.style.display = 'none';
-
-                    // Remove review mode class
-                    tabInfo.element.classList.remove('review-mode');
-                }
-
-                // 3. Force UI Refresh without saving stale content
-                // We pass a flag or just call it, but we need to ensure setActiveTab doesn't save *this* tab's stale content
-                // Refactor setActiveTab to check `this.activeTab !== filePath` for saving.
-                await this.setActiveTab(tabFilePath);
-            }
-            this.showNotification(`Changes applied to ${this.getFileNameFromPath(targetPath)}`, 'success');
-
-            // Refresh file tree
-            this.refreshFileTree();
-
-                    
-=======
->>>>>>> origin/main
                     // Hide Diff View Manually
                     const diffContainer = document.getElementById('diff-editor-container-tab');
                     if (diffContainer) diffContainer.style.display = 'none';
@@ -2090,11 +1685,6 @@ class CodeEditor {
             document.getElementById('file-path').textContent = '';
             const langStatus = document.getElementById('language-status');
             if (langStatus) langStatus.querySelector('span').textContent = 'Plain Text';
-<<<<<<< HEAD
-            const langStatus = document.getElementById('language-status'); 
-            if(langStatus) langStatus.querySelector('span').textContent = 'Plain Text';
-=======
->>>>>>> origin/main
         }
     }
 
@@ -2337,30 +1927,6 @@ class CodeEditor {
         const chatMessages = document.getElementById('ai-chat-messages');
         if (chatMessages) chatMessages.innerHTML = '';
         this.aiChatHistory = [];
-<<<<<<< HEAD
-
-        const ragToggle = document.getElementById('rag-toggle');
-        if (ragToggle) ragToggle.checked = false;
-
-        window.electronAPI.resetRAGIndex().catch(err => console.error('Failed to reset RAG:', err));
-
-        // Use the folder structure if provided
-    // Reset Chat and RAG
-    const chatMessages = document.getElementById('ai-chat-messages');
-    if (chatMessages) chatMessages.innerHTML = '';
-    this.aiChatHistory = [];
-    
-    const ragToggle = document.getElementById('rag-toggle');
-    if (ragToggle) ragToggle.checked = true;
-    
-    try {
-        await window.electronAPI.resetRAGIndex();
-        this.indexCodebase(); // Trigger indexing (async)
-    } catch (err) {
-        console.error('Failed to reset RAG:', err);
-    }
-=======
->>>>>>> origin/main
 
         const ragToggle = document.getElementById('rag-toggle');
         if (ragToggle) ragToggle.checked = false;
@@ -2746,8 +2312,6 @@ class CodeEditor {
         }
     }
 
-<<<<<<< HEAD
-=======
     async handleMultiFileEdit(task) {
         console.log("HandleMultiFileEdit: Starting Native Diff Workflow");
 
@@ -2817,7 +2381,6 @@ class CodeEditor {
             this.addAIMessage('ai', `**System Error:** ${error.message}`);
         }
     }
->>>>>>> origin/main
 
     simulateProgress(elementId) {
         const phases = [
@@ -2850,26 +2413,6 @@ class CodeEditor {
     async openEditAsDiff(edit) {
         const filePath = edit.file_path;
 
-<<<<<<< HEAD
-        // ensure file is open (creates tab if needed)
-        if (edit.is_new) {
-            const fileName = this.getFileNameFromPath(filePath);
-            if (!this.tabs.has(filePath)) {
-                this.createTab(filePath, fileName);
-            }
-        } else {
-            // Open existing file
-            try {
-                // We use openFile to ensure tab exists and content loaded
-                await this.openFile(filePath, null, this.getFileNameFromPath(filePath));
-            } catch (e) {
-                console.warn("Could not open file from disk (maybe new?):", e);
-            }
-        }
-
-        
-=======
->>>>>>> origin/main
         // ensure file is open (creates tab if needed)
         if (edit.is_new) {
             const fileName = this.getFileNameFromPath(filePath);
@@ -2907,34 +2450,6 @@ class CodeEditor {
     // 1. Modifying `setActiveTab` to check for `isDiff` flag.
     // 2. If diff, render DiffEditor.
 
-<<<<<<< HEAD
-
-    setChatMode(mode) {
-        this.currentMode = mode;
-        
-        // Update UI
-        const chatBtn = document.getElementById('mode-chat');
-        const agentBtn = document.getElementById('mode-agent');
-        
-        if (chatBtn && agentBtn) {
-            if (mode === 'chat') {
-                chatBtn.classList.add('active');
-                chatBtn.style.background = '#007acc';
-                chatBtn.style.color = 'white';
-                
-                agentBtn.classList.remove('active');
-                agentBtn.style.background = 'transparent';
-                agentBtn.style.color = '#858585';
-            } else {
-                agentBtn.classList.add('active');
-                agentBtn.style.background = '#4ec9b0';
-                agentBtn.style.color = '#1e1e1e';
-                
-                chatBtn.classList.remove('active');
-                chatBtn.style.background = 'transparent';
-                chatBtn.style.color = '#858585';
-            }
-=======
     async applyAllEdits(edits) {
         this.showNotification('Applying all changes...', 'info');
         try {
@@ -2975,7 +2490,6 @@ class CodeEditor {
 
         } catch (error) {
             this.showNotification(`Error: ${error.message}`, 'error');
->>>>>>> origin/main
         }
     }
 
@@ -2993,13 +2507,6 @@ class CodeEditor {
             return;
         }
 
-<<<<<<< HEAD
-        // Detect if this is an explicit edit command
-        if (message.toLowerCase().startsWith('/edit') || message.toLowerCase().includes('change current file')) {
-            // For now, hook into chat, but ideally we parse intent
-        
-=======
->>>>>>> origin/main
         // Detect if this is an explicit edit command
         if (message.toLowerCase().startsWith('/edit') || message.toLowerCase().includes('change current file')) {
             // For now, hook into chat, but ideally we parse intent
@@ -3012,7 +2519,6 @@ class CodeEditor {
         this.showAITypingIndicator();
 
         try {
-            console.log("DEBUG: sendAIMessage Mode:", this.currentMode);
             const messages = document.getElementById('ai-chat-messages');
             const history = [];
             if (messages) {
@@ -3038,7 +2544,6 @@ class CodeEditor {
             // Check for RAG toggle
             const ragToggle = document.getElementById('rag-toggle');
             const useRag = ragToggle ? ragToggle.checked : false;
-            const useRag = !!this.workspacePath;
 
             const context = {
                 current_code: code.substring(0, 1000),
@@ -3082,25 +2587,6 @@ class CodeEditor {
                     }
                 } else {
                     this.addAIMessage('ai', `**Chat Error:** ${result.error}`);
-<<<<<<< HEAD
-            
-            // Check Mode
-            if (this.currentMode === 'agent') {
-                // Agent Mode: Use Multi-File Workflow
-                this.hideAITypingIndicator();
-                await this.handleMultiFileEdit(message);
-                return;
-            } else {
-                // Chat Mode: Use Standard RAG Chat
-                const response = await window.electronAPI.chat(message, history, context);
-                this.hideAITypingIndicator();
-
-                if (response.success) {
-                    this.addAIMessage('ai', response.response);
-                } else {
-                    this.addAIMessage('ai', `**Error:** ${response.error}`);
-=======
->>>>>>> origin/main
                 }
                 return;
             }
@@ -3121,12 +2607,9 @@ class CodeEditor {
 
     async handleMultiFileEdit(task) {
         try {
+            // Maxwell's Demon: Sorting the fast (in memory) from the slow (needs fetching)
+            // 1. Collect potential context files
             let contextFiles = [];
-<<<<<<< HEAD
-            if (this.currentFile && !this.currentFile.startsWith('Untitled')) {
-                contextFiles.push(this.currentFile);
-            }
-=======
 
             // Add current file
             if (this.currentFile && !this.currentFile.startsWith('Untitled')) {
@@ -3134,17 +2617,13 @@ class CodeEditor {
             }
 
             // Add open tabs
->>>>>>> origin/main
             for (const [filePath, tab] of this.tabs.entries()) {
                 if (filePath && !filePath.startsWith('Untitled')) {
                     contextFiles.push(filePath);
                 }
             }
-<<<<<<< HEAD
-=======
 
             // Add visible files in root (simple heuristic for now, RAG will handle deep search)
->>>>>>> origin/main
             if (this.fileTree && this.fileTree.children) {
                 this.fileTree.children.forEach(child => {
                     if (child.type === 'file' && !contextFiles.includes(child.path)) {
@@ -3152,75 +2631,24 @@ class CodeEditor {
                     }
                 });
             }
-<<<<<<< HEAD
-            contextFiles = [...new Set(contextFiles)];
-=======
 
             contextFiles = [...new Set(contextFiles)]; // Dedupe
 
 
             console.log('Sending multi-file edit request:', { task, files: contextFiles });
->>>>>>> origin/main
 
             this.addAIMessage('ai', `🧠 **Generating Plan & Edits...**\n\n*Analyzing ${contextFiles.length} files with RAG & Tree-sitter...*`);
             this.showAITypingIndicator();
 
             const result = await window.electronAPI.multiFileEdit(task, contextFiles);
-<<<<<<< HEAD
-=======
 
->>>>>>> origin/main
             this.hideAITypingIndicator();
 
             if (result.success) {
+                // Show Plan
                 if (result.plan) {
                     this.addAIMessage('ai', `**Plan:**\n${result.plan}\n\nReviewing changes...`);
                 }
-<<<<<<< HEAD
-
-                if (result.edits && result.edits.length > 0) {
-                    this.addAIMessage('ai', `I've proposed changes for ${result.edits.length} files. Opening them for review...`);
-
-                    for (const edit of result.edits) {
-                        const filePath = this.normalizePath(edit.file_path);
-                        const fileName = this.getFileNameFromPath(filePath);
-
-                        if (edit.hunks && edit.hunks.length > 0 && edit.original_content) {
-                            let content = edit.original_content;
-                            let success = true;
-                            for (const hunk of edit.hunks) {
-                                if (content.includes(hunk.search)) {
-                                    content = content.replace(hunk.search, hunk.replace);
-                                } else {
-                                    console.warn(`Hunk failed: Could not find search block in ${fileName}`, hunk.search);
-                                    success = false;
-                                }
-                            }
-                            edit.new_content = content;
-                            edit.patchSuccess = success;
-                        } else if (!edit.new_content && !edit.is_new) {
-                            edit.new_content = edit.original_content;
-                        }
-
-                        if (!this.tabs.has(filePath)) {
-                            this.createTab(filePath, fileName);
-                        }
-
-                        const tabInfo = this.tabs.get(filePath);
-                        if (tabInfo) {
-                            tabInfo.isDiff = true;
-                            tabInfo.editData = edit;
-                            tabInfo.element.classList.add('review-mode');
-                        }
-
-                        const contentToLoad = edit.is_new ? '' : (edit.original_content || '');
-                        await this.openFile(filePath, contentToLoad, fileName);
-                    }
-
-                    if (result.edits.length > 0) {
-                        this.setActiveTab(this.normalizePath(result.edits[0].file_path));
-                    }
-=======
 
                 // Cursor-like Review: Open tabs and set them to Diff Mode
                 if (result.edits && result.edits.length > 0) {
@@ -3298,41 +2726,23 @@ class CodeEditor {
                         this.setActiveTab(result.edits[0].file_path);
                     }
 
->>>>>>> origin/main
                 } else {
                     this.addAIMessage('ai', `Analyzed context but found no code changes needed.`);
                 }
             } else {
                 this.addAIMessage('ai', `**Error executing workflow:** ${result.error}`);
             }
-<<<<<<< HEAD
-=======
 
->>>>>>> origin/main
         } catch (error) {
             this.hideAITypingIndicator();
             console.error('Workflow error:', error);
             this.addAIMessage('ai', `**Workflow Error:** ${error.message}`);
         }
     }
-    }
 
     showEditPreview(edits) {
         this.pendingEdits = edits;
 
-<<<<<<< HEAD
-        // Remove existing review panel if any
-        const existingPanel = document.querySelector('.review-panel');
-        if (existingPanel) existingPanel.remove();
-
-        const messages = document.getElementById('ai-chat-messages');
-
-        const panel = document.createElement('div');
-        panel.className = 'review-panel';
-
-        
-=======
->>>>>>> origin/main
         // Remove existing review panel if any
         const existingPanel = document.querySelector('.review-panel');
         if (existingPanel) existingPanel.remove();
@@ -3424,25 +2834,6 @@ class CodeEditor {
             this.diffEditor.dispose();
         }
 
-<<<<<<< HEAD
-        require(['vs/editor/editor.main'], () => {
-            const originalModel = monaco.editor.createModel(originalContent, language);
-            const modifiedModel = monaco.editor.createModel(modifiedContent, language);
-
-            this.diffEditor = monaco.editor.createDiffEditor(document.getElementById('diff-monaco'), {
-                theme: 'vs-dark',
-                readOnly: true,
-                originalEditable: false,
-                automaticLayout: true
-            });
-
-            this.diffEditor.setModel({
-                original: originalModel,
-                modified: modifiedModel
-            });
-        
-=======
->>>>>>> origin/main
         require(['vs/editor/editor.main'], () => {
             const originalModel = monaco.editor.createModel(originalContent, language);
             const modifiedModel = monaco.editor.createModel(modifiedContent, language);
@@ -3475,16 +2866,6 @@ class CodeEditor {
     async acceptEdits() {
         if (!this.pendingEdits || this.pendingEdits.length === 0) return;
 
-<<<<<<< HEAD
-        // Remove review panel
-        const panel = document.querySelector('.review-panel');
-        if (panel) panel.remove();
-
-        this.closeDiffView();
-
-        
-=======
->>>>>>> origin/main
         // Remove review panel
         const panel = document.querySelector('.review-panel');
         if (panel) panel.remove();
@@ -3498,7 +2879,6 @@ class CodeEditor {
     async applyAllEdits(edits) {
         if (!edits || edits.length === 0) return;
 
-<<<<<<< HEAD
         // Show progress?
         this.showNotification(`Applying ${edits.length} edits...`, 'info');
 
@@ -3507,22 +2887,6 @@ class CodeEditor {
         }
 
         this.showNotification('All edits applied successfully', 'success');
-    }
-
-        
-=======
->>>>>>> origin/main
-        // Show progress?
-        this.showNotification(`Applying ${edits.length} edits...`, 'info');
-
-        for (const edit of edits) {
-            await this.applySingleEdit(edit);
-        }
-
-        this.showNotification('All edits applied successfully', 'success');
-        
-        // Auto-reindex after changes
-        this.indexCodebase();
     }
 
     rejectEdits() {
@@ -3707,12 +3071,6 @@ class CodeEditor {
         try {
             const result = await window.electronAPI.indexCodebase(this.workspacePath);
 
-<<<<<<< HEAD
-        try {
-            const result = await window.electronAPI.indexCodebase(this.workspacePath);
-            
-=======
->>>>>>> origin/main
             if (result.success) {
                 this.showNotification(`Indexed ${result.files} files`, 'success');
             } else {
@@ -3724,9 +3082,6 @@ class CodeEditor {
             if (ragToggle) ragToggle.checked = false;
         } finally {
             if (label) label.textContent = originalText;
-            }
-        } catch (error) {
-            this.showNotification(`Indexing error: ${error.message}`, 'error');
         }
     }
 
