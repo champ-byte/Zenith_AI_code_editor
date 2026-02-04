@@ -195,3 +195,4 @@ class TreeSitterService:
         if name_node:
             return name_node.text.decode('utf8')
         return None
+        
