@@ -2,6 +2,7 @@ const { app, BrowserWindow, Menu, ipcMain, dialog, shell } = require('electron')
 const path = require('path');
 const fs = require('fs');
 const { spawn } = require('child_process');
+const simpleGit = require('simple-git');
 
 let mainWindow;
 let fileWatchers = new Map();
@@ -607,15 +608,147 @@ ipcMain.handle('agent-edit', async (event, data) => {
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(data)
     });
-    
+
     if (!response.ok) {
       const errorText = await response.text();
       return { success: false, error: `Backend error: ${response.status} - ${errorText}` };
     }
-    
+
     return await response.json();
   } catch (error) {
     console.error('Error in agent-edit:', error);
+    return { success: false, error: error.message };
+  }
+});
+
+ipcMain.handle('read-file', async (event, filePath) => {
+  try {
+    return fs.readFileSync(filePath, 'utf-8');
+  } catch (error) {
+    console.error('Error reading file:', error);
+    throw error;
+  }
+});
+
+ipcMain.handle('git-action', async (event, { action, path: workspacePath, data }) => {
+  if (!workspacePath) return { success: false, error: 'No workspace path' };
+
+  const git = simpleGit(workspacePath);
+
+  try {
+    // Check if it's a git repo first
+    const isRepo = await git.checkIsRepo();
+    if (!isRepo && action !== 'init') {
+      return { success: false, error: 'Not a git repository' };
+    }
+
+    switch (action) {
+      case 'status': {
+        const repoStatus = await git.status();
+        return {
+          success: true,
+          branch: repoStatus.current,
+          files: repoStatus.files.map(f => ({
+            path: f.path,
+            status: f.working_dir || f.index,
+            isConflict: (f.working_dir === 'U' || f.index === 'U')
+          })),
+          isMerge: (await fs.promises.access(path.join(workspacePath, '.git', 'MERGE_HEAD')).then(() => true).catch(() => false))
+        };
+      }
+
+      case 'log': {
+        const log = await git.log({ n: 20 });
+        return { success: true, all: log.all };
+      }
+
+      case 'branches': {
+        const branches = await git.branch();
+        return { success: true, all: branches.all, current: branches.current };
+      }
+
+      case 'create-branch': {
+        if (data.stash) {
+          await git.stash(['push', '-m', `Auto-stash before creating branch ${data.name}`]);
+        }
+        await git.checkoutLocalBranch(data.name);
+        return { success: true, message: `Created and switched to branch ${data.name}` };
+      }
+
+      case 'checkout': {
+        try {
+          if (data.stash) {
+            await git.stash(['push', '-m', `Auto-stash before checkout to ${data.name}`]);
+          }
+          await git.checkout(data.name);
+          if (data.pop) {
+            try { await git.stash(['pop']); } catch (e) { /* might conflict */ }
+          }
+          return { success: true, message: `Switched to branch ${data.name}` };
+        } catch (e) {
+          return { success: false, error: e.message };
+        }
+      }
+
+      case 'stash': {
+        await git.stash(['push', '-m', data.message || 'Manual stash']);
+        return { success: true, message: 'Changes stashed' };
+      }
+
+      case 'stash-pop': {
+        await git.stash(['pop']);
+        return { success: true, message: 'Latest stash applied' };
+      }
+
+      case 'commit': {
+        await git.add('.');
+        const commitResult = await git.commit(data || 'Manual commit from Zenith');
+        return { success: true, message: `Committed ${commitResult.commit}` };
+      }
+
+      case 'push':
+      case 'pull':
+      case 'sync': {
+        const currentStatus = await git.status();
+        let remoteUrl = '';
+        try {
+          remoteUrl = await git.remote(['get-url', 'origin']);
+          remoteUrl = remoteUrl.trim();
+
+          if (data && data.token && remoteUrl.includes('github.com')) {
+            // Insert token into URL: https://TOKEN@github.com/user/repo.git
+            if (remoteUrl.startsWith('https://')) {
+              remoteUrl = remoteUrl.replace('https://', `https://${data.token}@`);
+            } else if (remoteUrl.startsWith('git@github.com:')) {
+              const match = remoteUrl.match(/git@github.com:(.*)\.git/);
+              if (match) {
+                remoteUrl = `https://${data.token}@github.com/${match[1]}.git`;
+              }
+            }
+          }
+        } catch (e) {
+          return { success: false, error: 'No remote "origin" found. Please add a remote first.' };
+        }
+
+        if (action === 'pull' || action === 'sync') {
+          await git.pull(remoteUrl, currentStatus.current);
+        }
+        if (action === 'push' || action === 'sync') {
+          await git.push(remoteUrl, currentStatus.current);
+        }
+        return { success: true, message: `${action.toUpperCase()} successful` };
+      }
+
+      case 'init': {
+        await git.init();
+        return { success: true, message: 'Git repository initialized' };
+      }
+
+      default:
+        return { success: false, error: `Unknown git action: ${action}` };
+    }
+  } catch (error) {
+    console.error(`Git action ${action} error:`, error);
     return { success: false, error: error.message };
   }
 });
