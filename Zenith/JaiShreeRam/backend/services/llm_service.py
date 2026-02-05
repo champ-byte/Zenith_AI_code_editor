@@ -31,22 +31,14 @@ class GeminiService:
         """Initialize Gemini service"""
         self.api_key = os.getenv("GEMINI_API_KEY")
         self.model_name = os.getenv("GEMINI_MODEL", "gemini-2.5-flash")
-<<<<<<< HEAD
 
-=======
-        
->>>>>>> origin/main
         # Initialize attributes
         self.llm = None
         self.creative_llm = None
         self.precise_llm = None
         self.analytical_llm = None
         self.model = f"{self.model_name} (unconfigured)"
-<<<<<<< HEAD
 
-=======
-        
->>>>>>> origin/main
         if not self.api_key:
             logger.error("GEMINI_API_KEY is not set")
             logger.warning("Generative AI features will be unavailable.")
@@ -69,11 +61,7 @@ class GeminiService:
             self.creative_llm = ChatGoogleGenerativeAI(model=self.model_name, google_api_key=self.api_key, temperature=0.9)
             self.precise_llm = ChatGoogleGenerativeAI(model=self.model_name, google_api_key=self.api_key, temperature=0.1)
             self.analytical_llm = ChatGoogleGenerativeAI(model=self.model_name, google_api_key=self.api_key, temperature=0.3)
-<<<<<<< HEAD
 
-=======
-            
->>>>>>> origin/main
             logger.info(f"Gemini Service initialized with model: {self.model}")
         except Exception as e:
             logger.error(f"Failed to initialize Gemini components: {str(e)}")
