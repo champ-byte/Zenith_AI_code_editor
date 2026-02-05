@@ -271,7 +271,6 @@ contextBridge.exposeInMainWorld('electronAPI', {
         }
     },
     
-    chatWithAI: async (message, history = [], context = {}) => {
     chat: async (message, history = [], context = {}) => {
         try {
             const response = await fetch(`${API_BASE_URL}/chat`, {
