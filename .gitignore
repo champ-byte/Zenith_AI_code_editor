@@ -7,3 +7,5 @@ chroma_db/
 chromadb/
 chroma_db_local/
 *.sqlite3
+__pycache__/
+*.pyc
